@@ -53,3 +53,7 @@ ppp_maryland_loans %>%
   arrange(desc(max_loan_amount))
 ```
 
+
+### Packages
+
+Lubridate - makes it easier to work with dates, times and timespans; gets R to recognize that you have the dates and times you think you do
