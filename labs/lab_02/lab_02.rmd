@@ -1,0 +1,131 @@
+---
+title: "lab_02"
+author: "derek willis"
+date: "8/09/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and establish settings
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+
+# Load the tidyverse. If you have not installed the tidyverse already, remove the # from the next line and run it first.  
+# install.packages('tidyverse')
+library(tidyverse)
+library(lubridate)
+```
+
+## Load Data
+
+Let's keep working with the slice of WinRed contribution data from West Virginia.  
+
+```{r}
+wv_winred_contribs <- read_rds("data/lab_02.rds")
+```
+
+## Examine Data
+
+## Answer questions
+
+**Q1** Create a new column that divides the contribution amounts into the following options - less than $10, $10-$25, $26-$50, $51_$100, $101-$500, $501 and up - and calculates how many contributions are in each group. How would you describe the distribution of contributions in a sentence?
+A1. 
+
+```{r}
+wv_winred_contribs %>% 
+  mutate(amount_category = case_when(
+        amount < 10 ~ "Less than $10",
+        amount >= 10 & amount < 25 ~ "$10-$24.99",
+        amount >= 25 & amount < 50 ~ "$25-$49.99",
+        amount >= 50 & amount < 100 ~ "$50-$99.99",
+        amount >= 100 & amount < 500 ~ "$100-$499.99",
+        amount >= 500 ~ "$500 or more"
+      )
+  ) %>% 
+  group_by(amount_category) %>% 
+  summarize(count_contribs = n())
+```
+The clear majority of contributions were less than $50, and contributions over $50 became more rare the larger they were.
+
+Q2. Which West Virginia donors made the most contributions of less than $10? You'll need to use a combination of columns to get unique donors.  
+A2. 
+
+```{r}
+"wv_winred_contribs_2" <- wv_winred_contribs %>% 
+  mutate(amount_category = case_when(
+        amount < 10 ~ "Less than $10",
+        amount >= 10 & amount < 25 ~ "$10-$24.99",
+        amount >= 25 & amount < 50 ~ "$25-$49.99",
+        amount >= 50 & amount < 100 ~ "$50-$99.99",
+        amount >= 100 & amount < 500 ~ "$100-$499.99",
+        amount >= 500 ~ "$500 or more"
+      )
+  ) %>% 
+  group_by(amount_category) %>% 
+  summarize(count_contribs = n())
+```
+```{r}
+wv_winred_contribs %>% 
+  mutate(amount_category = case_when(
+        amount < 10 ~ "Less than $10",
+        amount >= 10 & amount < 25 ~ "$10-$24.99",
+        amount >= 25 & amount < 50 ~ "$25-$49.99",
+        amount >= 50 & amount < 100 ~ "$50-$99.99",
+        amount >= 100 & amount < 500 ~ "$100-$499.99",
+        amount >= 500 ~ "$500 or more")) %>%
+  filter(amount_category == "Less than $10") 
+```
+```{r}
+Contribs_less_than_10 <- wv_winred_contribs %>% 
+  mutate(amount_category = case_when(
+        amount < 10 ~ "Less than $10",
+        amount >= 10 & amount < 25 ~ "$10-$24.99",
+        amount >= 25 & amount < 50 ~ "$25-$49.99",
+        amount >= 50 & amount < 100 ~ "$50-$99.99",
+        amount >= 100 & amount < 500 ~ "$100-$499.99",
+        amount >= 500 ~ "$500 or more")) %>%
+  filter(amount_category == "Less than $10")
+```
+```{r}
+Contribs_less_than_10 %>%
+  group_by(last_name, first_name, address_one) %>%
+  summarise(count_contribs = n()) %>% 
+  arrange(desc(count_contribs))
+```
+ Is there a way to group by last name, first name and address but also show other columns?
+ 
+ 
+Q3. What questions do the results of Q2 raise in your mind? How could you use the data to explore them? No code here, just your questions.
+A3. How many recipients did the people who made the largest number of contributions of less than $10 donate to?
+Did they make these donations all in one blast or at different points in the campaign season?
+Were people who made just one or a few contributions more likely to donate close to major campaign deadlines?
+What is the geographic distribution of donors who fit the above trends?
+
+I'm having trouble figuring out how I would do these things.
+
+Q4. Which month saw the most contributions?
+A4. June 2022 saw the most contributions.
+
+```{r}
+wv_winred_contribs %>% 
+  mutate(month = floor_date(date, "month")) %>% 
+  group_by(month) %>%
+  summarize(count_contribs = n()) %>%
+  arrange(desc(count_contribs))
+```
+
+Q5. How many contributions of $2,900 - the individual maximum donation - were there, and who did they go to? How many of the recipients are from West Virginia? Do some googling to find out.
+A5. There were six donations of $2,900, four of which went to West Virginia candidates. Half of them went to Carol Miller, a Republican Congresswoman for West Virginia. One went to David McKinley, a Republican Congressman for West Virginia.
+
+The other two donations were for candidates outside of West Virginia. One went to Steven Palazzo, a Republican Congressman for Mississippi. One went to Ryan Zinke, a Republican Congressman for Montana. 
+
+Most of them were endorsed by Trump. It looks like in WV, Miller was endorsed by Trump and won, and McKinley lost to the candidate endorsed by Trump. Ryan Zinke was endorsed by Trump and won. Steven Palazzo was endorsed by Trump but lost. Maybe these donors made their big contributions in hope of seeing Trump's candidates win.
+
+```{r}
+wv_winred_contribs %>% 
+  filter(amount == 2900)
+```
