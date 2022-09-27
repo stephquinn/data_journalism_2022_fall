@@ -36,7 +36,7 @@ library(tidyverse)
 
 ### Summarizing
 
-I need to use group_by and summariz. Here's an example of grouping by county and calculating counts, sum and other descriptive statistics.
+I need to use group_by and summarize. Here's an example of grouping by county and calculating counts, sum and other descriptive statistics.
 
 
 ```{r}
@@ -52,7 +52,80 @@ ppp_maryland_loans %>%
   ) %>%
   arrange(desc(max_loan_amount))
 ```
+9/26
+Mutate to clean up data
+Fix a wrong value in a column and change the data type
+e.g.:
+```{r}
+texas_precinct_20 <- texas_precinct_20 %>%
+  mutate(election_day = case_when(
+    election_day == '5+' ~ '49',
+    TRUE ~ election_day
+  ))
 
+texas_precinct_20 <- texas_precinct_20 %>% mutate(election_day = as.numeric(election_day))
+```
+
+Used mutate and case_when to replace incorrect 5+ with 49 -- don't forget TRUE to keep the other values as they were
+Used mutate and as.numeric to make election_day values into numbers
+
+
+clean_names() from "janitor" library standardizes column headers to eliminate all caps, add underscores instead of spaces, make sure none of them starts with numbers...
+
+```{r}
+cleaned_conowingo <- conowingo %>%
+  clean_names()
+```
+
+rename() allows you to rename a column header
+```{r}
+cleaned_conowingo <- conowingo %>%
+  clean_names() %>% 
+  rename(linenumber = x1_linenumber)
+```
+
+distinct() eliminates duplicates
+get_dupes() shows you the duplicates
+
+
+str_sub to make all zip codes 5 numbers long
+```{r}
+# cleaning function
+cleaned_conowingo <- conowingo %>%
+  clean_names() %>% 
+  rename(linenumber = x1_linenumber) %>% 
+  mutate(amount = as.numeric(amount)) %>% 
+  distinct() %>%
+  mutate(zip = str_sub(zip, start=1L, end=5L))
+```
+
+str_to_title() to standardize capitalization in, for instance, city names
+```{r}
+# cleaning function
+cleaned_conowingo <- conowingo %>%
+  clean_names() %>% 
+  rename(linenumber = x1_linenumber) %>% 
+  mutate(amount = as.numeric(amount)) %>% 
+  distinct() %>%
+  mutate(zip = str_sub(zip, start=1L, end=5L)) %>%
+  mutate(city = str_to_title(city))
+```
+
+str_detect with the ^ says, "Look in the city column. If you find something that starts with Conowing, change it to Conowingo."
+```{r}
+# cleaning function
+cleaned_conowingo <- conowingo %>%
+  clean_names() %>% 
+  rename(linenumber = x1_linenumber) %>% 
+  mutate(amount = as.numeric(amount)) %>% 
+  distinct() %>%
+  mutate(zip = str_sub(zip, start=1L, end=5L)) %>%
+  mutate(city = str_to_title(city)) %>%
+  mutate(city = case_when(
+    str_detect(city,"^Conowing") ~ "Conowingo",
+    TRUE ~ city
+  ))
+  
 
 ### Packages
 
