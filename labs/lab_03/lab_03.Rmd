@@ -1,0 +1,184 @@
+---
+title: "lab_03"
+author: "Derek Willis"
+date: "8/10/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and establish settings
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+
+# Load the tidyverse here
+library(tidyverse)
+# Load janitor here
+library(janitor)
+```
+
+## Load data
+```{r}
+# Write code to load MD slice of FEC House candidate contribution data and call it md_contribs.
+# The data is called lab_03.rds, and is in the data folder alongside lab_03.Rmd (this data notebook)
+
+md_contribs <- read_rds("data/lab_03.rds")
+```
+
+```{r}
+glimpse(md_contribs)
+```
+
+## Answer questions
+
+Q1: Which seven cities in Maryland had the largest _number_ of contributions from donors? How many did each have? To answer this question, you'll have to clean the messy "contributor_city" field.
+
+Note: To answer this question, you'll need to see every variation of the "contributor_city" for the top seven cities, which you should identify through some initial analysis. Then find variations of them and change those variations into the most common version.
+
+A1: The seven Maryland cities with the largest number of contributions were Baltimore (6726 contributions), Bethesda (5860), Silver Spring (4659), Chevy Chase (3443), Potomac (2351), Rockville (2302) and Annapolis (2019).
+```{r}
+ranked_contrib_amount <- md_contribs %>% 
+  group_by(contributor_city) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+
+ranked_contrib_amount
+```
+
+```{r}
+ranked_contrib_amount %>% 
+  mutate(count_category = case_when(
+    count <= 10 ~ "Up to 10")) %>% 
+  filter(count_category == "Up to 10")
+```
+```{r}
+md_contribs %>% 
+  filter(contributor_city == "11509 LAKE POTOMAC DRIVE" | contributor_city == "15600 BEECH TREE PKWY" | contributor_city == "15616 EVERGLADE LN APT 404")
+```
+I checked where the above zip codes are. Only 11509 Lake Potomac Drive is in one of the top seven cities. I changed it below.
+
+```{r}
+cleaner_md_contribs <- md_contribs %>% 
+  mutate(contributor_city = case_when(
+    contributor_city == "GWYNN OAK, BALTO CITY" ~ "BALTIMORE",
+    contributor_city == "SLIVER SPRING" ~ "SILVER SPRING",
+    contributor_city == "SILVER SPRING, MD" ~ "SILVER SPRING",
+    contributor_city == "ANAPOLIS" ~ "ANNAPOLIS",
+    contributor_city == "ANNAPOLID" ~ "ANNAPOLIS",
+    contributor_city == "ANRETIREDPOLIS" ~ "ANNAPOLIS",
+    contributor_city == "POTAMIC" ~ "POTOMAC",
+    contributor_city == "BALITMORE" ~ "BALTIMORE",
+    contributor_city == "BETHSDA" ~ "BETHESDA",
+    contributor_city == "ANNNAPOLIS" ~ "ANNAPOLIS",
+    contributor_city == "BETHESA" ~ "BETHESDA",
+    contributor_city == "11509 LAKE POTOMAC DRIVE" ~ "POTOMAC",
+    TRUE ~ contributor_city))
+
+cleaner_md_contribs
+```
+
+```{r}
+cleanest_md_contribs <- cleaner_md_contribs %>% 
+   mutate(contributor_city = case_when(
+    str_detect(contributor_city,"^BALT") ~ "BALTIMORE",
+    str_detect(contributor_city, "^BETH") ~ "BETHESDA",
+    str_detect(contributor_city, "^SILV") ~ "SILVER SPRING",
+    str_detect(contributor_city, "^CHEV") ~ "CHEVY CHASE",
+    str_detect(contributor_city, "^POT") ~ "POTOMAC",
+    str_detect(contributor_city, "^ROCK") ~ "ROCKVILLE",
+    str_detect(contributor_city, "^ANN") ~ "ANNAPOLIS",
+    TRUE ~ contributor_city))
+
+cleanest_md_contribs
+```
+I wanted to check for these exceptions:
+```{r}
+cleaner_md_contribs %>% 
+  filter(contributor_city == "POTOMAC HEIGHTS") %>% 
+  filter(contributor_city == "POTOMAC PARK") %>% 
+  filter(contributor_city == "BALTIMORE HIGHLANDS") %>% 
+  filter(contributor_city == "BALLENGER CREEK") %>% 
+  filter(contributor_city == "BALTIMORE HIGHLANDS") %>% 
+  filter(contributor_city == "ROCK HALL") %>% 
+  filter(contributor_city == "ROCK POINT") %>% 
+  filter(contributor_city == "ANNAPOLIS NECK") %>% 
+  filter(contributor_city == "CHEVERLY") %>% 
+  filter(contributor_city == "CHEVY CHASE VIEW") %>% 
+  filter(contributor_city == "CHEVY CHASE VILLAGE") %>% 
+  filter(contributor_city == "SILVER HILL")
+```
+
+
+```{r}
+newest_ranked_contrib_amount <- cleanest_md_contribs %>% 
+  group_by(contributor_city) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+
+newest_ranked_contrib_amount
+```
+  
+Q2: Find the 5-digit ZIP code in Maryland that had the highest total amount of contributions (by dollar value). Where is that zip code and what kind of area is it? Which committee is the largest recipient of money from that zip code? How many of the top five recipients are Maryland candidates?
+
+A2: 20815 is mostly Chevy Chase - a wealthy, predominantly white suburb of Washington, D.C. According to U.S. Census QuickFacts, the median housing unit value in Chevy Chase is $957,000, the median household income is $192,273 and only 1.9% of the population is in poverty. 80.6% of residents are white.
+
+Jamie Raskin for Congress is the largest recipient of money from this zip code. 
+
+Two of the top five, Raskin and Mizeur, are Maryland candidates. The others are out of state (Susan Wild - Pennsylvania; Pelosi - California; Liz Cheney - Wyoming).
+
+```{r}
+cleaner_md_contribs %>% 
+  mutate(contributor_zip = as.character(contributor_zip)) %>% 
+  mutate(contributor_zip = str_sub(contributor_zip, start=1L, end=5L)) %>% 
+  group_by(contributor_zip) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+ 
+# Hint
+# First, create a dataframe that shows the top 5-digit ZIP code by total dollar amount
+# Second, use the top ZIP code in the dataframe you just created and create a new dataframe that shows the committee that got the most money from that ZIP code.
+
+```
+```{r}
+cleaner_md_contribs %>% 
+  mutate(contributor_zip = as.character(contributor_zip)) %>% 
+  mutate(contributor_zip = str_sub(contributor_zip, start=1L, end=5L)) %>%
+  filter(contributor_zip == "20815") %>% 
+  group_by(committee_name) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+```
+Q3: Let's look at top individual donors to House campaigns. Write code to generate a list of top donors using name and city, adding up the total amount of contributions. One of the top few donors has a very strong connection to the U.S. House - who is that and what does he do? How does his donation pattern differ from the second-largest donor, and what can you say about that second-largest donor?
+
+Feel free to add any interesting "color" (little interesting details) you find in your research.  
+
+A3: David Trone, the top individual donor, is himself a member of the House, a Democrat from Maryland's 6th congressional district. He founded and co-owns the popular wine and liquor wholesaler Total Wine. According to one Bethesda Magazine article, Trone was ranked the 17th wealthiest member of Congress in 2020 and, this election season, has contributed $12.55 million to his own campaign (https://bethesdamagazine.com/2022/09/08/political-notes-trones-re-election-prospects-seen-improving-as-general-election-gets-underway/). Total Wine has been under investigation in multiple states for unfair business practices involving pricing and its relationship with wholesalers.
+
+The second largest donor, Juanita Mason, has a smaller online presence, but she seems to have been featured in this USA Today article about Trump-supporting lawmakers' fundraising efforts (https://www.usatoday.com/story/news/politics/elections/2022/02/22/trump-lawmakers-funding-america-first/9317598002/). I can't see the whole article because I don't subscribe, but it says Mason is a retiree from Maryland who repeatedly donated to Matt Gaetz and Marjorie Taylor Greene in 2021. She also seems to have donated to "Bikers for the President" - maybe she rides a motorcycle? (https://www.city-data.com/elec2/20/elec-BALTIMORE-MD-20-part64.html). From her address, it looks like she lives in a fancy apartment building in Baltimore.
+
+While Trone seems to make fewer large donations between $1000 and $5800 to various Democratic candidates per campaign season, Mason makes more frequent, smaller donations between $10 and $50 to (I think) a smaller number of Trump-aligned Republican candidates. For instance, Mason made a lot of donations to "Texans for Ronny Jackson" - several pages' worth - in 2021.
+
+
+
+```{r}
+cleaner_md_contribs %>% 
+  group_by(contributor_first_name, contributor_last_name, contributor_city) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+
+# Hint
+# First, create a dataframe of top individual contributors
+# Second, use information from that dataframe to examine individual donations from the original md_contribs dataframe.
+
+```
+```{r}
+md_contribs %>% 
+  filter(contributor_first_name == "DAVID" & contributor_last_name == "TRONE")
+```
+```{r}
+md_contribs %>% 
+  filter(contributor_first_name == "JUANITA" & contributor_last_name == "MASON")
+```
