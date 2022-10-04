@@ -125,6 +125,15 @@ cleaned_conowingo <- conowingo %>%
     str_detect(city,"^Conowing") ~ "Conowingo",
     TRUE ~ city
   ))
+```
+
+bind_rows tacks on one series of rows onto another. Used in combination with list
+
+```{r}
+# bind_rows with list
+county_voters_combined <- bind_rows(list(county_voters_2016, county_voters_2018, county_voters_2020))
+```
+
   
 
 ### Packages
