@@ -1,0 +1,249 @@
+---
+title: "lab_05"
+author: "Derek Willis"
+date: "8/24/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## About this lab
+
+To complete this lab, you need to:
+* run existing code as directed (look for **Task**).
+* modify existing code as directed (look for **Task**).
+* write code in empty codeblocks provided to answer questions included (look for **Q**).
+* write out the answer in the form of a complete sentence in the space given (look for **A**).
+
+When you are finished, commit changes and push to your personal GitHub repo, then submit the URL to this document on ELMS.
+
+## Load libraries and establish settings
+
+You'll need to load three packages for this: the tidyverse, lubridate and janitor.
+
+**Task** load these three packages.
+
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+library(tidyverse)
+library(lubridate)
+library(janitor)
+
+```
+
+For this lab, we want to investigate spending by Maryland state and local candidates during the current election. For example, we could ask how much money have candidates and committees spent on advertising on Facebook? Which vendors received the most money for media expenses? We have the data, but it's messy - names of payees are spelled differently and capitalized differently - and we need to clean it up. We'll use a combination of RStudio and OpenRefine to do that.
+
+The basic process here is to start in RStudio, export data so that we can use OpenRefine to clean it up, and then bring it back into RStudio to finish our analysis.
+
+## Load Data
+
+You'll need to load one data set, a CSV file of Maryland campaign expenditures located in the data folder called "md_expenses.csv"
+
+**Task** Create a codeblock below, then read the data in and assign it to an appropriate variable name. You'll want to clean up the column names and make sure that any date columns are actually date datatypes.
+
+```{r}
+# Load the Maryland expenditures data table and make any fixes/changes you need to
+md_expenses <- read_csv("data/md_expenses.csv")
+cleaned_md_expenses <- md_expenses %>% 
+  clean_names() %>% 
+  mutate(expenditure_date = as.Date(expenditure_date))
+```
+
+```{r}
+problems(cleaned_md_expenses)
+```
+
+
+## Answer questions
+
+**Q1.** You've been assigned to write about Maryland political committees' use of Facebook advertising. There's a category column in the data that has values for different kinds of spending. One of them is "Media". Write code to isolate Media expenses where the name of the payee is not NA. Then, using `write_csv`, make a CSV file in your data folder. 
+
+Using OpenRefine, create a project using that CSV file, create a copy of the `payee_name` column called `payee_clean` and then standardize it, focusing on the payees that appear most often. Pay particular attention to variations of Facebook, bearing in mind that it changed its name last year: https://about.fb.com/news/2021/10/facebook-company-is-now-meta/), but also clean up variations of the most common payees.
+
+Then, when you are done standardizing `payee_clean`, export it as a new CSV file to your data folder, *giving it a different name* and read it back into RStudio as a new dataframe.
+
+Then, using that `payee_clean` column, write code to find all of the spending where Facebook is the payee and calculate the total amount of spending for each committee and present the results showing the committee that spent the most first.
+
+**A1.** The committee that paid Facebook the most was Friends of Ashwani Jain, at $62,657.38.
+
+```{r}
+cleanest_md_expenses <- cleaned_md_expenses %>% 
+  filter(expense_category == "Media") %>% 
+  filter(payee_name != "NA") 
+```
+
+
+```{r}
+md_media_names <- write_csv(cleanest_md_expenses, "data/cleanest_md_expenses.csv")
+```
+
+```{r}
+new_cleanest_md_expenses <- read_csv("data/new_cleanest_md_expenses.csv")
+
+new_cleanest_md_expenses
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(payee_clean == "Meta")
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(payee_clean == "Facebook")
+```
+         
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(payee_clean == "Meta") %>% 
+  group_by(committee_name) %>% 
+  summarize(total_amount = sum(amount)) %>% 
+  arrange(desc(total_amount))
+```
+
+**Q2.** Let's do some research on the top committees from question 1. Look up the top 10 spenders: if they are candidate committees, what offices were they running for? If they were not candidates, what issues do they seem to care about? Write some sentences answering those questions, then go to the Facebook ad library (https://www.facebook.com/ads/library/?active_status=all&ad_type=political_and_issue_ads&country=US&sort_data[direction]=desc&sort_data[mode]=relevancy_monthly_grouped&media_type=all) and look for ads from the top spender. What do you notice about those ads? There's no code required here.
+
+**A2.** The committees that spent the most on Facebook ads are overwhelmingly PACs for Democratic gubernatorial campaigns, but not the top performers in the primary. Ashwani Jain, a former Obama staffer who previously ran unsuccessfully for Montgomery County Council, got 2% of the vote. Peter Franchot and Monique Anderson-Walker, whose supporters spent the second and third largest amounts on Facebook ads, came in third with 21% of the vote. Jon Baron and Natalie Williams, who got 1.77% of the vote, and John King and Michelle Siri, who got 3.71% of the vote, also show up in the top ten.
+
+Eve Shuman and Billy Boniface both ran for county offices: Shuman for Prince George's County Council and Boniface for Harford County Executive.
+
+Casa in Action advocates for working-class Latino and immigrant Marylanders. The WFP National PAC is the committee of the Working Families Party, a progressive group advocating for the working class.
+
+Ashwani Jain's ads seem to have overwhelmingly been shown to Facebook users between 25 and 44, possibly because Jain was the youngest gubernatorial candidate at 32. Also, at least his most recent ads seem to have been viewed by more women than men.
+
+
+**Q3.** Given the list of top spenders in A1 and the primary results for governor (https://elections.maryland.gov/elections/2022/primary_results/gen_results_2022_1.html), who is missing from that Q1 list? Did those campaigns run Facebook ads? Who are the biggest recipients of media expenses by the Democratic primary winner for governor (HINT: that person has two committees you should account for)?
+
+**A3.** 
+The frontrunners in the Democratic primary - and Republicans in general - are missing from the list of top spenders in A1.
+Wes Moore and Aruna Miller's campaign seems not to have run Facebook ads in the period covered by this data, although the Facebook Ad Library shows that Wes Moore for Maryland has run Facebook ads. According to this data, neither Wes Moore for Maryland nor Moore Miller For Maryland Slate seems to have run Facebook ads.
+
+The Perez/Sneed campaign, which came second in the Democratic primary, also seems not to have run Facebook ads.
+
+Dan Cox and Gordana Schifanelli, who won the Republican gubernatorial primary, also show no payments to Facebook in this data.
+
+The biggest recipients of media payments from the Moore/Miller campaign are for the political consulting firm SKDK, which provided newspaper, video and radio services, and Foglamp, which the campaign used for website development and online advertising. The campaign also used Apollo Artistry for website design and maintenance.
+
+```{r}
+new_cleanest_md_expenses %>%
+  group_by(committee_name) %>% 
+  summarize(total_amount = sum(amount)) %>% 
+  arrange(desc(total_amount))
+```
+
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Perez and Sneed for Maryland Slate")
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Perez and Sneed for Maryland Slate") %>% 
+  filter(payee_clean == "Meta")
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Perez  Tom for Maryland") %>% 
+  filter(payee_clean == "Meta")
+```
+
+```{r}
+cleaned_md_expenses %>% 
+  filter(committee_name == "Moore  Wes For Maryland") 
+```
+
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Moore  Wes For Maryland")
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Moore  Wes For Maryland") %>% 
+  filter(payee_clean == "Meta")
+```
+
+
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Moore Miller For Maryland Slate")  %>% 
+  filter(payee_clean == "Meta")
+```
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Moore Miller For Maryland Slate") %>% 
+  filter(payee_clean == "Meta")
+```
+
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Schifanelli  Gordana Citizens for")
+```
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Cox  Dan for Governor") %>% 
+  filter(payee_clean == "Meta")
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Cox  Dan for Governor") %>% 
+  group_by(payee_clean) %>% 
+  summarize(total_amount = sum(amount)) %>% 
+  arrange(desc(total_amount))
+```
+
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Moore  Wes For Maryland" | committee_name == "Moore Miller For Maryland Slate") %>% 
+  group_by(payee_clean) %>% 
+  summarize(total_amount = sum(amount)) %>% 
+  arrange(desc(total_amount))
+```
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Moore  Wes For Maryland" | committee_name == "Moore Miller For Maryland Slate") %>%
+  filter(payee_clean == "SKDK")
+```
+```{r}
+new_cleanest_md_expenses %>%
+  filter(committee_name == "Moore  Wes For Maryland" | committee_name == "Moore Miller For Maryland Slate") %>%
+  filter(payee_clean == "Foglamp" | payee_clean == "Apollo Artistry")
+```
+**Q4.** The media expense data you cleaned also has a standardized purpose column. Write code to generate a list of the committees with the total amount of spending on online advertising. How does this list compare to the one from Q1 about top Facebook spenders? Of the top 5 committees who spent the most on Facebook ads from Q1, are there any that appear to have spent *all* of their online advertising dollars on Facebook? 
+
+**A4.** Jon Baron and Natalie Williams' gubernatorial campaign was in both the top ten committees that spent the most on Facebook ads and the top ten committees that paid the most for online advertising. Also, the two top performers in the Democratic gubernatorial primary, Wes Moore/Aruna Miller and Tom Perez/Shannon Sneed, appear in the top ten biggest spenders on online advertising.
+
+It looks like Franchot Anderson-Walker for Maryland Slate only spent online advertising money on Facebook ads.
+
+```{r}
+cleanest_md_expenses %>% 
+  filter(expense_purpose == "Online Advertising") %>% 
+  group_by(committee_name) %>% 
+  summarize(total_amount = sum(amount)) %>% 
+  arrange(desc(total_amount))
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Baron  Jon (Jonathan) for Maryland" | committee_name == "Boniface  Billy Friends Of" | committee_name == "Franchot  Peter Friends Of" | committee_name == "Franchot Anderson-Walker for Maryland Slate" | committee_name == "Jain Ashwani Friends of") %>% 
+  filter(expense_purpose == "Online Advertising") %>% 
+  group_by(committee_name) %>% 
+  summarize(distinct_payees = n_distinct(payee_clean))
+```
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee_name == "Franchot Anderson-Walker for Maryland Slate") %>% 
+  filter(expense_purpose == "Online Advertising")
+```
+
+```{r}
+new_cleanest_md_expenses %>% 
+  filter(committee)
+```
+
+**Q5** You've been asked to summarize your findings about spending on Facebook by Maryland political candidates. How much do we know and what don't we know? What's the best story idea you've found here?
+
+**A5** Facebook ads seem not to have helped Maryland political candidates win their races. Successful candidates in the gubernatorial primary hired advertising and consulting firms to promote their campaigns. Wes Moore paid more than $3 million for the services of SKDKnickerbocker, a public affairs and political consulting firm. Interestingly, three of Cox's top five payees were radio companies. 
+
+One thing we don't know is the extent to which those who cast votes for the winning candidates were the people their media expenditures were targeting. 
+
+We also don't know who the non-candidate committees were supporting with their Facebook ads. If they were supporting particular candidates, who were they? And if they were spending these large amounts supporting particular candidates, do their Facebook expenditures act essentially as campaign contributions? Does this raise questions about the effectiveness of state campaign finance laws?
+

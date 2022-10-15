@@ -1,0 +1,96 @@
+
+```{r echo=FALSE, message=FALSE}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(dplyr)
+```
+
+```{r}
+jeff_warner_contribs <- read_csv("schedule_a-2022-10-11T21_52_54.csv")
+
+jeff_warner_contribs
+```
+
+```{r}
+jeff_warner_contribs %>% 
+  group_by(contributor_name) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+```
+
+```{r}
+jeff_warner_contribs %>% 
+  group_by(contributor_name) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+```
+```{r}
+jeff_warner_contribs %>% 
+  filter(contributor_name == "MCDERMOTT, NANCY")
+```
+```{r}
+jeff_warner_contribs %>% 
+  filter(contributor_name == "GOMEZ, DANIEL")
+```
+
+```{r}
+jeff_warner_contribs %>% 
+  filter(contributor_name == "KARPOVITCH, JEAN")
+```
+
+```{r}
+jeff_warner_contribs %>% 
+  filter(contributor_name == "WHEATLEY, DAVID")
+```
+```{r}
+jeff_warner_contribs %>% 
+  filter(contributor_name == "GORLINE, JERRY")
+```
+```{r}
+jeff_warner_contribs %>% 
+  mutate(month = floor_date(contribution_receipt_date, "month")) %>% 
+  group_by(month) %>%
+  summarize(count_contribs = n()) %>%
+  arrange(desc(count_contribs))
+```
+
+```{r}
+jeff_warner_expenditures <- read_csv("schedule_b-2022-10-11T22_41_05.csv")
+
+jeff_warner_expenditures
+```
+```{r}
+jeff_warner_expenditures %>% 
+  group_by(recipient_name) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+```
+
+```{r}
+jeff_warner_expenditures %>% 
+  group_by(recipient_name) %>%
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+```
+
+```{r}
+jeff_warner_expenditures %>% 
+  group_by(disbursement_description) %>% 
+  summarize(count=n()) %>% 
+  arrange(desc(count))
+```
+```{r}
+jeff_warner_expenditures %>% 
+  group_by(disbursement_description) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+```
+```{r}
+jeff_warner_expenditures %>% 
+  filter(disbursement_description == "CAMPAIGN REIMBURSEMENTS FOR APRIL 1-JUNE 30")
+```
+
+```{r}
+jeff_warner_otherPAC_contribs <- 
+```
