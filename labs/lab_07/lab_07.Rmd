@@ -1,0 +1,204 @@
+---
+title: "lab_07"
+author: "derek willis"
+date: "10/21/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## You will need
+
+* A Census API key
+
+## Load libraries and establish settings
+
+You'll need to load two packages for this: the tidyverse and tidycensus.
+
+**Task** load these two packages
+
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+library(tidyverse)
+library(tidycensus)
+
+# Load the libraries you'll need
+
+```
+
+## Setup Census API
+
+You'll need your Census API Key:
+
+**Task** set your API Key if you haven't already
+
+```{r echo=FALSE}
+census_api_key("YOUR API KEY", overwrite=TRUE)
+```
+
+## Load and view ACS variables
+
+You'll also need to load the list of American Community Survey variables from the 2020 5-year estimates so you can identify the codes you need:
+
+**Task** load the variables from the 2020 5-year ACS and save them to a dataframe
+
+```{r}
+acs5_2020 <- load_variables(2020, "acs5")
+```
+
+## Answer questions
+
+**Q1** What is the Maryland jurisdiction with the lowest median age, according to the ACS 2020 5-year estimates? You will need to find the variable for median age first.
+**A1** Baltimore City has the lowest median age, at 35.5.
+
+```{r}
+md_med_age <- get_acs(geography = "county",
+              variables = c(medage = "B01002_001"),
+              state = "MD",
+              year = 2020)
+
+md_med_age <- md %>% arrange(estimate)
+
+md_med_age
+
+```
+
+
+
+**Q2** Which Maryland counties have a median age of at least 50? You can use the dataframe you just made to answer this, but you must write code to display only those counties with a median age of at least 50.
+**A2** Worcester and Talbot counties have median ages of at least 50: 50.5 and 51.0.
+
+```{r}
+md_over_50 <- md %>% 
+  filter(estimate >= "50")
+md_over_50
+```
+
+**Q3** We're interested in knowing which Maryland counties have the highest percentage of 5-17 year-olds who speak Spanish at home and *also* speak English fluently. Start with the code you wrote for Q1 and alter it to show the total population of 5-17 year-olds by county. Then create a second dataframe to show the number of 5-17 year-olds by county living in homes where Spanish is spoken but who speak English "very well" according to the ACS. To do this, you will need to find the ACS variables that represent those subjects. HINT: the phrase "very well" shows up in multiple variables - you want the one that doesn't include other factors like citizenship. 
+
+For each dataframe, rename the `estimate` column to a meaningful name you've given the ACS variable, remove the `variable` columns in each using select and then join them on GEOID and NAME. Then you can add a column to calculate the percentage of the total 5-17 population that speaks Spanish at home.
+
+Which county has the highest percentage of 5-17 year-olds who speak Spanish at home and also speak English very well?
+
+**A3** In Prince George's County, 19.0% (rounding up) of 5-17 year-olds speak Spanish at home and also speak English. This is the highest percentage in the state.
+
+```{r}
+md_kids <- get_acs(geography = "county",
+              variables = c(md_kids = "B06001_003"),
+              state = "MD",
+              year = 2020) %>% 
+  rename(kids_5_to_17=estimate) %>% 
+  select(-variable)
+
+md_kids
+
+
+```
+```{r}
+md_kids_span_eng <- get_acs(geography = "county",
+              variables = c(md_kids_span_eng = "B16004_005"),
+              state = "MD",
+              year = 2020) %>% 
+  rename(md_kids_span_eng=estimate) %>% 
+  select(-variable)
+  
+md_kids_span_eng
+```
+```{r}
+md_kids_span_eng %>% 
+  inner_join(md_kids, by=c("GEOID", "NAME")) %>% 
+  mutate(percent_kids_span_eng = (md_kids_span_eng/kids_5_to_17)*100) %>% 
+  arrange(desc(percent_kids_span_eng))
+  
+```
+```{r}
+md_median_incomes <- get_acs(geography = "county",
+              variables = c(md_median_incomes = "B06011_001"),
+              state = "MD",
+              year = 2020) %>% 
+  arrange(desc(estimate))
+
+md_median_incomes
+```
+```{r}
+md_spanish_speakers <- get_acs(geography = "county",
+                               variables = c(md_spanish_speakers = "B06007_003"),
+                               state = "MD",
+                               year = 2020) %>% 
+  arrange(desc(estimate))
+
+md_spanish_speakers
+```
+
+
+**Q4** Given the counties with the largest percentage of 5-17 year-olds that speak Spanish at home, which county stands out to you in the data as different from the others? How would you describe the top 5 counties? How would you describe Garrett County's numbers?
+
+**A4** Talbot County and Dorchester County stand out to me as different from the others. They have relatively small populations. In addition to having a relatively small population of Spanish-speakers, Talbot County's population is older than I would expect for a high-ranking county for numbers of children speaking Spanish at home and English fluently.
+
+Of the remaining three of top five counties, the top two, Prince George's and Montgomery, are densely populated D.C. suburbs, while Frederick County is less densely populated.
+
+Garrett County has a tiny estimated number of 5-17 year olds who speak Spanish at home and speak English fluently: 25, or 0.6% of 5-17 year olds in the county.
+
+**Q5** Pennsylvanians are currently requesting and submitting mail ballots for the November election. You'd like to know more about the people who live in the areas sending in mail ballots. Read in the `zip_totals.csv` file in the data folder containing the number of returned mail ballots per zip code. Then create a dataframe of Pennsylvania ZCTAs that include the following variables from the 2019 ACS: total population and median income. You will need to add `output = "wide"` to the get_acs function so that you get columns for those two variables' estimates and margins of error.
+
+Join the ZCTA dataframe to the zip totals dataframe and calculate a per capita rate for mail ballots per 100 population in each ZCTA, and write code to answer the following questions?
+
+* Which zip code *that has returned at least 100 mail ballots* has the highest per capita rate? 19436
+* Where is that zip code and what does Census Reporter say about its demographics? 
+19436 is in Gwynedd, Pennsylvania, which is a Philadelphia suburb with a high median age of 75.6, according to Census Reporter. This zip code apparently also has a 100% white population, as well as some very wealthy people and a significant amount of people below the poverty line. Although the median income - $61,051 - is a little less than the state number, the per capita income is more than double the state number and the number for the Philadelphia metro area. The poverty rate - 17.6% - is 1.5 times that of the metro area and Pennsylvania as a whole. At this point, I'm thinking this zip code contains a retirement community.
+
+I used Google Maps to verify that, indeed, there is a retirement community in Gwynedd: Foulkeways at Gwynedd. This explains the high median age and maybe the significant poverty rate. It also makes sense that a retirement community, where people may not all be very mobile, would have a high rate of mail-in voting, even before covid. It's still weird that there's a reported 100% white population.... 
+* For zip codes with a per capita rate of at least 10 returned ballots per 100 people, how many have median incomes of at least $100,000? 84
+* How many have median incomes less than the state figure of $68,957? 997
+* What's the most interesting one from this last result? 
+I chose 16155 - Villa Maria, PA - because as far as I can tell it was one of the top five in terms of per capita mail-in voting because of its population of nuns. The population - 135 - is small, and the median age is 83.7. The Catholic Church has trouble recruiting young women to become nuns. The population is 95% female, and only 11% of people are married. 61% of women in this area never married. Villa Maria is home to Sisters of the Humility of Mary.
+**A5**
+
+```{r}
+pa_mailin <- read_csv("data/pa_zip_totals.csv")
+
+pa_mailin
+```
+```{r}
+acs5_2019 <- load_variables(2019, "acs5")
+
+pa_zcta <- get_acs(geography = "zcta",
+              variables = c(pa_total_population = "B01003_001", pa_median_income = "B19013_001"), 
+              state = "PA",
+              year = 2019, output="wide")
+
+```
+```{r}
+mailins_and_zcta <- pa_mailin %>% 
+  inner_join(pa_zcta, by=c("zip"="GEOID"))
+
+mailins_and_zcta
+```
+
+
+
+```{r}
+mailins_and_zcta %>% 
+  mutate(per_capita_mail_in = (count/pa_total_populationE)*100) %>% 
+  filter(count >=100) %>% 
+  arrange(desc(per_capita_mail_in))
+```
+```{r}
+mailins_and_zcta %>% 
+  mutate(per_capita_mail_in = (count/pa_total_populationE)*100) %>% 
+  filter(count >= 10) %>% 
+  filter(pa_median_incomeE >= 100000)
+```
+```{r}
+mailins_and_zcta %>% 
+  mutate(per_capita_mail_in = (count/pa_total_populationE)*100) %>% 
+  filter(count >= 10) %>% 
+  filter(pa_median_incomeE < 68957) %>% 
+  arrange(desc(per_capita_mail_in))
+  
+```
+
+
