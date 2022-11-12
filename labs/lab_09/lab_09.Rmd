@@ -1,0 +1,230 @@
+---
+title: "lab_09"
+author: "Derek Willis"
+date: "11/09/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## You will need
+
+* the tidyverse, janitor and tigris libraries
+* you might choose to use the tidycensus library for Q3
+
+## Load libraries and establish settings
+
+**Task** Create a codeblock and load appropriate packages and settings for this lab.
+
+```{r}
+# Turn off scientific notation
+options(scipen=999)
+
+# Load libraries
+library(tidyverse)
+library(janitor)
+library(tigris)
+library(tidycensus)
+library(sf)
+```
+
+Let's explore the election results from last night and make some maps! 
+
+## Questions 
+
+**Q1.** Make a county-level map of Maryland's results for governor using `md_gov_county.csv` in the data folder, calculating the difference between Wes Moore's percentage of the total votes and Dan Cox's percentage of the total votes and displaying that percentage difference on the map. What is the story here, and what is the county with the most interesting results?
+
+**A1.**  Dan Cox performed more poorly than I would have thought in counties associate with being conservative and/or rural, like Talbot, Frederick and Kent. Even in his home jurisdiction of Frederick County, Cox got less than 2% more of the vote than Moore. In Talbot County, Cox got less than 3% more of the vote than Moore according to this data.
+
+I would be interested in why Cox did somewhat poorly in Frederick County, where I would have expected him to have a good read on the electorate, and in Talbot County. The map shows a ring of medium blue, where Cox got little more than 50% of the vote, fanning out from the democratic strongholds of Montgomery and Prince George's counties. Is it just more evidence of people migrating from the more densely populated areas outside of D.C. to historically Republican jurisdictions?
+
+```{r}
+md_gov_county <- read_csv("data/md_gov_county.csv") %>% 
+  clean_names
+
+
+md_gov_county <- md_gov_county %>% 
+  mutate(total_votes = cox + moore + lashar + wallace + harding + write_ins)
+
+md_gov_county_2 <- md_gov_county %>% 
+  mutate(moore_percent = (moore/total_votes)*100) %>% 
+  mutate(cox_percent = (cox/total_votes)*100) %>% 
+  mutate(difference_percent = (moore_percent - cox_percent)) %>% 
+  arrange(difference_percent)
+
+```
+
+```{r}
+counties <- counties()
+md_counties <- counties %>% 
+  filter(STATEFP == "24")
+
+glimpse(md_counties)
+
+```
+```{r}
+md_counties <- md_counties %>% mutate(GEOID = as.numeric(GEOID)) %>% 
+  clean_names()
+glimpse(md_counties)
+glimpse(md_gov_county_2)
+```
+
+
+```{r}
+md_counties_with_gov <- md_counties %>% 
+  left_join(md_gov_county_2, by="geoid")
+
+md_counties_with_gov
+```
+Moore percent - Cox percent
+positive numbers: how much Moore won by
+negative numbers: how much Cox won by
+```{r}
+ggplot() +
+  geom_sf(data = md_counties_with_gov, aes(fill = difference_percent)) +
+  theme_minimal()
+
+```
+```{r}
+ggplot() +
+  geom_sf(data = md_counties_with_gov, aes(fill = difference_percent)) +
+  theme_minimal() +
+  scale_fill_viridis_b(option="magma")
+```
+
+
+**Q2.** Make another map showing the difference between Dan Cox's county-level performance in 2022 and Larry Hogan's in 2018, using percentages to compare the two as you did in Q1. You can use the dataframe you initially loaded for Q1, and you'll need to load the 2018 governor results in the data folder and join them to it before proceeding. Are there any counties where Cox got a higher percentage than Hogan? How would you describe the map showing the Hogan-Cox difference?
+
+Also answer this: is a map the best way to present this data? What else could you make that might convey more information?
+
+**A2.** There are no counties where Cox got a higher percentage than Hogan. The closest was Somerset County, where Hogan got only about 2% more of the vote than Cox. Cox was almost as popular as Hogan was in Garrett County, too. Cox did much worse in Talbot, Howard and Baltimore counties than Hogan. Why did Talbot County dislike Cox so much?
+
+I think a bar chart might be a good way to present this data, since we're trying to compare the percentages of the vote Cox and Hogan got in each county. Each county would have two bars - one for Hogan's percentage of the vote in 2018 and one for Cox's percentage of the vote in 2022.
+
+```{r}
+md_gov_county_18 <- read_csv("data/md_gov_county_18.csv")
+
+glimpse(md_gov_county_18)
+
+md_gov_county_18 <- md_gov_county_18 %>% 
+  clean_names() %>% 
+  mutate(total_votes = hogan + jealous + quinn + schlakman + write_ins) %>% 
+  mutate(hogan_percent = (hogan/total_votes)*100) 
+```
+
+```{r}
+md_counties_with_gov_both_years <- md_counties_with_gov %>% 
+  left_join(md_gov_county_18, by="geoid") %>% 
+  mutate(hogan_cox_difference_percent = (hogan_percent - cox_percent)) %>% 
+  arrange(hogan_cox_difference_percent)
+```
+the larger the number (and the lighter the blue), the better Hogan did compared to Cox
+```{r}
+ggplot() +
+  geom_sf(data = md_counties_with_gov_both_years, aes(fill = hogan_cox_difference_percent)) +
+  theme_minimal()
+```
+```{r}
+ggplot() +
+  geom_sf(data = md_counties_with_gov_both_years, aes(fill = hogan_cox_difference_percent)) +
+  theme_minimal() +
+  scale_fill_viridis_b(option="magma")
+```
+**Q3** Which county has the highest percentage of mail ballots remaining to be counted? Using the `mail_remaining.csv` file in the data folder, calculate the percentage of mail ballots remaining, then map a county map of those percentages. Looking at both the map and the data, are there counties where the candidate currently leading the governor's race could, in theory, change?
+
+**A3** Fourteen counties still have to count all of their mail-in ballots: Anne Arundel, Baltimore County, Caroline, Carroll, Cecil, Charles, Dorchester, Garrett, Harford, Kent, Queen Anne's, Somerset, Wicomico and Worchester. Of the counties that have started counting mail-in ballots, Frederick has the longest way to go: 79.1% of its 18,029 mail-in ballots.
+
+Counties that could flip at the point when this data was gathered would be those where there difference between Cox's and Moore's percent of the vote were small and where there was a large percentage of mail-in ballots still to be counted. The data shows that Moore was leading less than 3% in Anne Arundel County, where 100% of mail-in ballots had yet to be counted. In Frederick County, 79.1% of mail-in votes still had to be counted, and Cox was leading by less than 2%. Talbot, Wicomico, Harford and Kent could also have still flipped.
+
+
+```{r}
+mail_remaining <- read_csv("data/mail_remaining.csv")
+```
+```{r}
+mail_remaining <- mail_remaining %>% 
+  clean_names() %>% 
+  mutate(percent_remaining = (remaining/total_returned)*100) %>% 
+  arrange(desc(percent_remaining))
+```
+```{r}
+md_counties_gov_mail_remaining <- md_counties_with_gov %>% 
+  left_join(mail_remaining, by="geoid") 
+  
+```
+```{r}
+md_counties_flip <- md_counties_gov_mail_remaining %>% 
+  mutate(moore_cox_difference = (moore - cox)) %>% 
+  select(name, moore_cox_difference, remaining)
+
+```
+```{r}
+  ggplot() +
+  geom_sf(data = md_counties_gov_mail_remaining, aes(fill = percent_remaining)) +
+  theme_minimal()
+
+```
+**Q4.** Choose your own map adventure! In the data folder I've included county-level results for several other 2022 contests, including the Comptroller, Attorney General and the marijuana legalization amendment. I've also added the 2020 presidential results by county. Using one of the 2022 races that we haven't already used and at least one other contest for comparison, make a county-level map showing what you think is the most interesting aspect of that data, and describe the results in terms of a possible story. You can bring in other data, such as Census information, if you like.
+
+**A4.**  
+
+```{r}
+md_ag_county <- read_csv("data/md_ag_county.csv")
+
+md_ag_county <- md_ag_county %>% 
+  clean_names()
+
+md_ag_county <- md_ag_county %>% 
+  mutate(total_votes = peroutka + brown + write_ins) %>% 
+  mutate(peroutka_percent = (peroutka/total_votes)*100) %>% 
+  mutate(brown_percent = (brown/total_votes)*100) %>% 
+  mutate(difference_percent = brown_percent - peroutka_percent)
+md_ag_county
+
+```
+```{r}
+md_pres_county_20 <- read_csv("data/md_pres_county_20.csv")
+
+md_pres_county_20 <- md_pres_county_20 %>% 
+  clean_names() %>% 
+  mutate(total_votes = (trump + biden + jorgensen + hawkins +segal)) %>% 
+  mutate(percent_trump = (trump/total_votes)*100) %>% 
+  mutate(percent_biden = (biden/total_votes)*100) %>% 
+  mutate(difference_percent = (percent_biden - percent_trump)) %>% 
+  select(-jorgensen, -hawkins, -segal)
+md_pres_county_20
+```
+```{r}
+md_ag_pres_county <- md_pres_county_20 %>% 
+  left_join(md_ag_county, by="geoid")
+md_ag_pres_county <- md_counties %>% 
+  left_join(md_ag_pres_county, by="geoid") %>% 
+  mutate(difference_peroutka_trump = peroutka_percent - percent_trump) %>% 
+  mutate(difference_biden_brown = percent_biden - brown_percent)
+```
+```{r}
+ggplot() +
+  geom_sf(data = md_ag_pres_county, aes(fill = difference_peroutka_trump)) +
+  theme_minimal()
+
+```
+```{r}
+ggplot() +
+  geom_sf(data = md_ag_pres_county, aes(fill = difference_biden_brown)) +
+  theme_minimal()
+
+```
+```{r}
+ggplot() +
+  geom_sf(data = md_ag_pres_county, aes(fill = peroutka_percent)) +
+  theme_minimal()
+```
+Peroutka did better than Trump in every county in Maryland, but Biden did better than Brown in almost every county, with the exception of Prince George's County and Baltimore City, where Brown did better than Biden.
+
+Peroutka did much better than Trump in more conservative, rural counties of the eastern shore, like Somerset and Dorchester. Biden also did much better than Brown in these counties, suggesting that a moderate Democrat like Biden is positioned to do better there. Brown did the best relative to Biden in the state's most solidly Democratic counties like Prince George's, where Biden may have drawn skepticism for being too much of a centrist, and in the conservative counties of western Maryland, where it's neither Brown nor Biden probably had much success. It's a little bit difficult to draw conclusions about change over time without knowing the amounts of votes
+Is it possible that as the state's electorate trends more Democratic, those voting conservative are more amendable to Trump-like candidates like Peroutka?
+
+
+
+
