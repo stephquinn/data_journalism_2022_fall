@@ -87,7 +87,7 @@ Some publication systems allow for the embedding of HTML into a post or a story.
 
 **Answer** Copy the url of the graphic you published here. It will begin with https://datawrapper.dwcdn.net/. Don't copy the browser's current url.
 
-https://datawrapper.dwcdn.net/PfF0Q/1/
+https://datawrapper.dwcdn.net/PfF0Q/2/
 
 ### Task 8: Make a Choropleth Map
 
