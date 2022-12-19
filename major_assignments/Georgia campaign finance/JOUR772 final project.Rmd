@@ -1,0 +1,993 @@
+---
+title: "JOUR 772 final project"
+author: Stephanie Quinn
+output: html_document
+date: "2022-12-15"
+---
+
+#Between 2021 and 2022, the GA Republican Party, which had previous invested a lot more money in canvassing, phone calls and other direct communications with voters, shifted its investments to mailers. The Republican Party paid more to professional marketing agencies and political consulting firms in 2022 than 2021, as it became clearer that Georgia had become competitive for Democrats. In 2022, the GA Democratic Party, which had invested a lot of money in political consulting, decreased its already fairly small investment in canvassing and phone calls. The state Democratic Party also increased its expenditures on mailers and continued to invest heavily in GOTV and early voting efforts, including rallies with entertainment. It also paid for Spanish-language radio ads in 2022, making an effort to reach Hispanic and Latino voters.
+
+#I think a promising story idea would delve into how these two state parties' strategies are moving in opposing directions as their fortunes change. It appears that Republicans' recent moves in some ways mimicking the state Democratic party - paying more for professional campaign consultants, moving toward mailers and away from canvassing - have not been totally successful. Meanwhile, the closeness of the 2022 runoff suggests that Democrats' relative lack of canvassing efforts in GA may become a problem for the party. The story would examine why the parties have historically taken the approaches they have and why they are changing. It would be interesting to talk with the people who interacted most closely with potential voters in each campaign and ask whether they think their party will be successful, and to talk to voters who were canvassed or participated in rallies.
+
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(janitor)
+library(lubridate)
+library(sf)
+library(tigris)
+library(ggplot2)
+library(stringr)
+```
+
+
+```{r}
+rep_raw_contribs <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/rep_raw_contribs.csv", guess_max = 3760)
+rep_processed_contribs <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/rep_processed_contribs.csv", guess_max = 4753)
+
+dem_contribs <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/dem_processed_contribs.csv", guess_max = 20557)
+
+
+```
+```{r}
+#CLEANING DEM CONTRIBS
+dem_contribs <- dem_contribs %>% 
+  rename(committee_name = "committee_name...2") %>% 
+  select(-5, -6, -7, -8, -9, -11, -12, -13, -15, -16, -17, -21, -23, -29, -30, -32, -33, -34, -38, -40, -41, -42, -43, -44, -45, -48, -49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64, -65, -66, -67, -68, -69, -70, -71, -72, -73, -74, -75, -76, -77, -78, -79)
+
+glimpse(dem_contribs)
+
+# Change date column from <chr> to actual ymd.
+class(dem_contribs$contribution_receipt_date)
+
+dem_contribs<-dem_contribs %>% 
+  mutate(contribution_receipt_date = lubridate::ymd(contribution_receipt_date))
+
+# Fix zip codes.
+dem_contribs$contributor_zip <- str_sub(dem_contribs$contributor_zip, 1, 5)
+
+```
+
+```{r}
+#CLEANING REP CONTRIBS
+
+rep_processed_contribs <- rep_processed_contribs %>% 
+  select(-5, -6, -7, -8, -9, -11, -12, -13, -15, -16, -17, -21, -23, -29, -30, -32, -33, -34, -38, -40, -41, -42, -43, -44, -45, -48, -49, -50, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64, -65, -66, -67, -68, -69, -70, -71, -72, -73, -74, -75, -76, -77, -78, -79)
+
+rep_processed_contribs <- rep_processed_contribs %>% 
+  rename(committee_name = "committee_name...2")
+
+rep_processed_contribs <- rep_processed_contribs %>% 
+  select(-3, -4, -6, -10, -16, -20, -21, -22)
+
+rep_raw_contribs <- rep_raw_contribs %>% 
+  select(-1, -3, -4, -6, -7, -8, -9, -10, -11, -13, -17, -26, -27, -28, -29, -30, -31, -32, -33, -35)
+
+rep_raw_contribs <- rep_raw_contribs %>% 
+  select(-15)
+
+#Fix zip codes
+rep_raw_contribs$contributor_zip <- str_sub(rep_raw_contribs$contributor_zip, 1, 5)
+
+rep_processed_contribs$contributor_zip <- str_sub(rep_processed_contribs$contributor_zip, 1, 5)
+
+#Combine new raw data with old data
+rep_contribs <- bind_rows(rep_processed_contribs, rep_raw_contribs)
+
+rep_contribs <- rep_contribs %>% 
+  distinct()
+
+```
+
+#Individual contribs - Dems
+```{r}
+#Individual contribs - Dems
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  summarize(sum(contribution_receipt_amount))
+#In 2021, the Georgia Democratic Party got $1,449,786 in individual contributions.
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  group_by(contributor_first_name, contributor_last_name, contributor_zip) %>% 
+  summarize(total_contrib = sum(contribution_receipt_amount)) %>% 
+  #arrange(desc(total_contrib))
+  arrange(total_contrib)
+# In 2021, the largest total individual contribution amount was $40,000 (though it looks like he was refunded $30,000 in 2022), while the smallest total greater than zero was $5.
+```
+```{r}
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  summarize(sum(contribution_receipt_amount))
+#In 2022, the Georgia Democratic Party got $3,543,253 in individual contributions.
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  group_by(contributor_first_name, contributor_last_name, contributor_zip) %>% 
+  summarize(total_contrib = sum(contribution_receipt_amount)) %>% 
+  #arrange(desc(total_contrib))
+  arrange(total_contrib)
+# In 2022, the largest total individual contribution amount was $20,000, while the smallest total greater than zero was $1.
+```
+
+```{r}
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) 
+# In 2022, the Georgia Democratic Party got the largest number of individual contributions between $100 and $500.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount)) 
+#In 2022, the GA Democratic Party got enough contributions from individuals greater than $500 that they were the greater source of contributions from individuals: $2,833,825.76.
+```
+```{r}
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) 
+# In 2021, the Georgia Democratic Party got the largest number of individual contributions between $25 and $50 and fewer donations of $500 or more than in 2022.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount)) 
+#In 2021, the GA Democratic Party got enough individual contributions greater than $500 that they were the greatest source of contributions from individuals: $995,133.64. This is a much smaller amount of money than in 2022.
+```
+```{r}
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(date_category = case_when(
+    contribution_receipt_date <= "2022-03-31" ~ "first quarter",
+    contribution_receipt_date > "2022-04-01" & contribution_receipt_date <= "2022-06-30" ~ "second quarter",
+    contribution_receipt_date > "2022-07-01" & contribution_receipt_date <= "2022-09-30" ~ "third quarter",
+    contribution_receipt_date > "2022-10-01" & contribution_receipt_date <= "2022-12-31" ~ "fourth quarter")) %>% 
+  group_by(date_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2022, the GA Democratic Party got the most money in contributions from individuals between July and the beginning of October. The fourth quarter, during which both the general election and the runoff happened, saw a comparatively modest amount of money contributed by individuals, possibly as a result of election coverage fatigue. Granted, the data only goes up to Nov. 16.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-11-08" & contribution_receipt_date <= "2022-12-31") %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+# In the week before the general election and the week after, the GA Democratic Party got $137,101.80 in individual contributions.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(date_category = case_when(
+    contribution_receipt_date <= "2021-03-31" ~ "first quarter",
+    contribution_receipt_date > "2021-04-01" & contribution_receipt_date <= "2021-06-30" ~ "second quarter",
+    contribution_receipt_date > "2021-07-01" & contribution_receipt_date <= "2021-09-30" ~ "third quarter",
+    contribution_receipt_date > "2021-10-01" & contribution_receipt_date <= "2021-12-31" ~ "fourth quarter")) %>% 
+  group_by(date_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2021, the GA Democratic Party made the most money from individual contributions in the last three months of the year, although at $444,786 it was not much more than half of what than the party got during the corresponding period in 2022, even though that was one of the least lucrative periods for individual contributions in 2022. Maybe this is because Georgia is now known as a "purple state," and donors believe that their contributions can actually help sway elections in Democrats' favor.
+```
+```{r}
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  group_by(contributor_state) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+
+#In 2022, (after Georgia) California, New York, Maryland and Massachussetts were the largest sources of individual contribs.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  group_by(contributor_state) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+# Georgia, California, New York, Massachusetts, Illinois. Maryland moved up in 2022.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(contributor_state == "MD") %>% 
+  group_by(contributor_zip) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+#In 2022, Potomac and Bethesda zip codes were the top sources of individual contributions in terms of dollar amount, with Baltimore/Towson and Baltimore City following.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(contributor_state == "MD") %>% 
+  group_by(contributor_zip) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+#In 2021, Montgomery County dominated Maryland's contributions.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  group_by(contributor_city) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+# In 2022, Baltimore ranked ninth in terms of dollar amount of individual contributions to the GA Democratic Party, with $46,236.66.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(contributor_city == "BALTIMORE") 
+# More than 100 of the 119 individual donations from Baltimore in 2022 came from someone named Susan Chouinard.
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(contributor_city == "BALTIMORE") 
+#Chouinard also accounts for about half of the individual donations from Baltimore in 2021.
+
+```
+```{r}
+#2021
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) 
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(!contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+
+#2022
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) 
+
+dem_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(!contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+
+#Between 2021 and 2022 the amount of money from out-of-state individual contributions to the GA Democratic Party nearly tripled, from $937,643.10 to $2,600,030. The number and amount of in-state individual contributions also increased, from 3643 contributions adding up to $512,142.60 to 3697 contributions adding up to $943,223.50. This suggests that contributions were larger in 2022.
+
+```
+
+
+#Individual contribs - Reps
+```{r}
+#Individual contribs - Reps
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  summarize(sum(contribution_receipt_amount))
+# In 2021, the Georgia Republican Party got $1,309,470 in individual contributions.
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  group_by(contributor_first_name, contributor_last_name, contributor_zip) %>% 
+  summarize(total_contrib = sum(contribution_receipt_amount)) %>% 
+  #arrange(desc(total_contrib))
+  arrange(total_contrib)
+# In 2021, the largest total individual contribution amount was $20,000, while the smallest total over zero was five cents. 
+```
+```{r}
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  summarize(sum(contribution_receipt_amount))
+#In 2022, the Georgia Republican Party got $2,395, 499 in individual contributions 
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(entity_type == "IND") %>% 
+  group_by(contributor_first_name, contributor_last_name, contributor_zip, contribution_receipt_date) %>% 
+  summarize(total_contrib = sum(contribution_receipt_amount)) %>% 
+  #arrange(desc(total_contrib))
+  arrange(total_contrib)
+# In 2022, the largest total individual contribution amount was $200,000 from Kenneth Fisher (though presumably he was refunded for over-contributing), while the smallest total greater than zero was $8.33.
+
+
+```
+
+```{r}
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) 
+# In 2022, the Georgia Republican Party got the largest number of individual contributions between $100 and $500. The party got the second largest number of individual contributions in the over-$500 category.
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount)) 
+#In 2022, the GA Republican Party got enough contributions from individuals greater than $500 that they were the greatest source of contributions from individuals: $2,265,885.11.
+```
+
+```{r}
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count)) 
+# In 2021, the Georgia Republican Party got the largest number of individual contributions between $10 and $24.99 - a very different range than in 2022. Maybe as Georgia gained a reputation for being a purple state, Republican contributors upped their contribution amounts? 
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(amount_category = case_when(
+    contribution_receipt_amount < 10 ~ "less than $10",
+    contribution_receipt_amount >= 10 & contribution_receipt_amount < 25 ~ "$10-$24.99",
+    contribution_receipt_amount >= 25 & contribution_receipt_amount < 50 ~ "$25-$49.99",
+    contribution_receipt_amount >= 50 & contribution_receipt_amount < 100 ~ "$50-$99.99",
+    contribution_receipt_amount >= 100 & contribution_receipt_amount < 500 ~ "$100-$499.99",
+    contribution_receipt_amount >= 500 ~ "$500 or more")) %>% 
+  group_by(amount_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount)) 
+#In 2021, the GA Republican Party got enough contributions from individuals greater than $500 that they were the greatest source of contributions from individuals: $1,003,211.67. The amount of money coming into the GA Republican Party from large donations increased between 2021 and 2022, but not as much as it did in Georgia. The GA Democratic Party seems to have started off with relatively few large donors and attracted a lot more as it became competitive for Democrats.
+```
+```{r}
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  mutate(date_category = case_when(
+    contribution_receipt_date <= "2022-03-31" ~ "first quarter",
+    contribution_receipt_date > "2022-04-01" & contribution_receipt_date <= "2022-06-30" ~ "second quarter",
+    contribution_receipt_date > "2022-07-01" & contribution_receipt_date <= "2022-09-30" ~ "third quarter",
+    contribution_receipt_date > "2022-10-01" & contribution_receipt_date <= "2022-12-31" ~ "fourth quarter")) %>% 
+  group_by(date_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2022, the GA Republican Party got the most money ($916, 864.40) in contributions from individuals between July and the beginning of October. The fourth quarter going up to 11/28, during which both the general election and the runoff happened, saw a little less money contributed by individuals, though not by too much: $910,314.40. This relatively strong late showing may indicate that Republican donors hoped their contributions could help push Walker to victory in the runoff.
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-11-08" & contribution_receipt_date <= "2022-12-31") %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+# In the week before the general election and few weeks after, the GA Republican Party got $172,311.80 - more than the Democrats got in a similar period. Granted, while the Republican data goes up to 11/28, the Democratic data only goes up to 11/16.
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  mutate(date_category = case_when(
+    contribution_receipt_date <= "2021-03-31" ~ "first quarter",
+    contribution_receipt_date > "2021-04-01" & contribution_receipt_date <= "2021-06-30" ~ "second quarter",
+    contribution_receipt_date > "2021-07-01" & contribution_receipt_date <= "2021-09-30" ~ "third quarter",
+    contribution_receipt_date > "2021-10-01" & contribution_receipt_date <= "2021-12-31" ~ "fourth quarter")) %>% 
+  group_by(date_category) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2021, the GA Republican Party made the most money from individual contributions in the first three months of the year ($692,592.60). How much of this was because of the runoff and its results? 
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-01-31") %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+# $338,367.60 (about half of the contribution amount from the first quarter) was from January.
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-01-15") %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+# About 38% of the first quarter's individual contribs came from the first two weeks of January.
+```
+```{r}
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  group_by(contributor_state) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+
+#In 2022, (after Georgia) Texas, California, Florida and Connecticut were the largest sources of individual contribs.
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  group_by(contributor_state) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+# After Georgia, California, Florida, Texas and Nevada were the largest source of individual contribs in 2021.
+```
+```{r}
+#2021
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) 
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>%
+  filter(!contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+
+#2022
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount)) 
+
+rep_contribs %>% 
+  filter(entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>%
+  filter(!contributor_state == "GA") %>% 
+  #summarize(count = n()) %>% 
+  summarize(total_amount = sum(contribution_receipt_amount))
+
+#In 2021, the GA Republican Party received more in-state individual donations (1290) than in 2022 (995), but less money ($477,599.80 compared to $864,871.80).
+#In 2021, the GA Republican Party received many more out-of-state individual donations (5064) than in 2022 (332), but less money ($831,870.60 compared to $1,530,628). So in-state and out-of-state contributors gave fewer larger contributions.
+```
+# Committee contribs - Dems
+```{r}
+dem_contribs %>% 
+  filter(!entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  group_by(contributor_name) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_name == "JON OSSOFF FOR SENATE")
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_name == "DEMOCRATIC SENATORIAL CAMPAIGN COMMITTEE")
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_name == "OSSOFF VICTORY FUND")
+
+# In 2021, Jon Ossoff For Senate, the Democratic Senatorial Campaign Committee and the Ossoff Victory Fund were the top three committee contributors to the Georgia Democratic Party.
+# Jon Ossoff for Senate contributed $1.5 million to the party on the eve of the 2021 runoff, in which he won.
+# The Democratic Senatorial Campaign Committee gave $521,259 throughout 2021.
+# The Ossoff Victory Fund contributed $447,170.67 throughout 2021.
+```
+```{r}
+dem_contribs %>% 
+  filter(!entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  group_by(contributor_name) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_name == "DEMOCRATIC SENATORIAL CAMPAIGN COMMITTEE")
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_name == "WARNOCK FOR GEORGIA")
+
+dem_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_name == "WARNOCK VICTORY FUND")
+#In 2022, the top non-individual contributors to the GA Democratic Party were the Democratic Senatorial Campaign Committee, Warnock for Georgia and the Warnock Victory Fund. The Democratic National Committee was next. The amounts were much bigger than in 2021.
+#The Democratic Senatorial Campaign Committee contributed $7,220,400 throughout 2022
+# Warnock for Georgia gave $2,829,220, mostly toward the end of 2022.
+# The Warnock Victory Fund gave $1,336,795.19 throughout 2022.
+
+```
+
+# Committee contribs - Reps
+```{r}
+rep_contribs %>% 
+  filter(!entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  group_by(contributor_last_name) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+#In 2021, the top non-individual contributors to the GA Republican Party (other than NA - I'm not sure why that happened) were the Palmetto Peach Fund, Take Back the House 2022 and the Mississippi Republican Party. 
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_last_name == "Palmetto Peach Fund")
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_last_name == "Take Back The House 2022")
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2021-01-01" & contribution_receipt_date <= "2021-12-31") %>% 
+  filter(contributor_last_name == "Mississippi Republican Party")
+
+#The Palmetto Peach Fund, based in Alexandria, VA, made one 2021 contribution of $202,249.10.
+#Take Back The House 2022, based in Bethesda, MD, made one 2021 contribution of $147,237.60.
+#The MS Republican Party made one contribution of $33,261.
+
+```
+```{r}
+rep_contribs %>% 
+  filter(!entity_type == "IND") %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  group_by(contributor_last_name) %>% 
+  summarize(total_contribs = sum(contribution_receipt_amount)) %>% 
+  arrange(desc(total_contribs))
+#In 2022, the top non-individual contributors to the GA Republican Party (other than NA - I'm not sure why that happened) were the Republican National Committee, the National Republican Senatorial Committee and Team Herschel, Inc. 
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_last_name == "Republican National Committee")
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_last_name == "National Republican Senatorial Committee")
+
+rep_contribs %>% 
+  filter(contribution_receipt_date >= "2022-01-01" & contribution_receipt_date <= "2022-12-31") %>% 
+  filter(contributor_last_name == "Team Herschel, Inc.")
+
+#The Republican National Committee contributed $4,927,065.95 mostly toward the end of 2022.  .
+#The National Republican Senatorial Committee contributed $3,025,867 in the last months of 2022.
+#Team Herschel, Inc., contributed $1,318,000 in a single contribution between the general election and the runoff.
+```
+#Disbursements - Dems
+```{r}
+rep_processed_disbursements <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/rep_processed_disbursements.csv", guess_max = 4515)
+rep_raw_disbursements <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/rep_raw_disbursements.csv", guess_max = 1801)
+
+dem_disbursements <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/dem_disbursements.csv", guess_max = 4156)
+```
+```{r}
+#CLEANING DEM DISBURSEMENTS
+dem_disbursements <- dem_disbursements %>% 
+  select(-4, -5, -6, -7, -8, -11, -12, -15, -16, -17, -18, -20, -21, -24, -25, -26, -27, -28, -29, -30, -31, -32, -33, -34, -35, -36, -37, -38, 39, -40, -42, -43, -44, -45, -46, -47, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64, -67, -68, -69, -70, -71, -73, -74, -75, -76, -77, -78)
+
+dem_disbursements <- dem_disbursements %>% 
+    select(-3, -5, -11, -12, -13, -14, -15, -17, -18)
+
+#Change dates to ymd
+dem_disbursements<-dem_disbursements %>% 
+  mutate(disbursement_date = lubridate::ymd(disbursement_date))
+
+# Fix zip codes.
+dem_disbursements$recipient_zip <- str_sub(dem_disbursements$recipient_zip, 1, 5)
+
+
+#CLEANING REP DISBURSEMENTS
+rep_processed_disbursements <- rep_processed_disbursements %>% 
+  select(-4, -5, -6, -7, -8, -11, -12, -15, -16, -17, -18, -20, -21, -24, -25, -26, -27, -28, -29, -30, -31, -32, -33, -34, -35, -36, -37, -38, 39, -40, -42, -43, -44, -45, -46, -47, -51, -52, -53, -54, -55, -56, -57, -58, -59, -60, -61, -62, -63, -64, -67, -68, -69, -70, -71, -73, -74, -75, -76, -77, -78)
+
+rep_processed_disbursements <- rep_processed_disbursements %>% 
+  select(-3, -5, -11, -12, -13, -14, -15, -17, -18)
+
+rep_raw_disbursements <- rep_raw_disbursements %>% 
+  select(-1, -3, -4, -6, -7, -8, -9, -10, -11, -14, -17, -18, -19, -20, -24, -25, -26, -27, -28)
+
+rep_disbursements <- bind_rows(rep_raw_disbursements, rep_processed_disbursements)
+
+class(rep_disbursements$disbursement_date)
+
+#Change dates to ymd
+rep_disbursements<-rep_disbursements %>% 
+  mutate(disbursement_date = lubridate::ymd(disbursement_date))
+
+# Fix zip codes.
+rep_disbursements$recipient_zip <- str_sub(rep_disbursements$recipient_zip, 1, 5)
+  
+```
+```{r}
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+# In 2021, the state Democratic party made the largest number of payments, 141, to Citizens Trust Bank, with its 64 payments to the Democratic fundraising platform ActBlue Technical Services.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2021, the state Democratic party paid the largest amount of money ($1,102,586.27) to Paychex, Inc., a payroll and benefits outsourcing company. Mission Control and Deliver Strategies, LLC, are political strategy firms. The party also transferred $316,447.30 to the Democratic Party of Georgia state account - presumably to pay expenses not related to candidates for federal office. Political strategy and communications firms were top recipients of funds.
+```
+```{r}
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+# In 2022, the state Democratic party again made the largest number of payments, 152, to Citizens Trust Bank, with 59 payments to the Democratic fundraising platform ActBlue Technical Services.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2022, the GA Democratic Party paid the largest amount ($5,529,203.28) to Deliver Strategies, which had received the third most money from the party in 2021. Paychex, Inc., came in second with less than in 2021: $946,664.49. Rising Tide Interactive, LLC, a campaign strategy firm, came in third with $371,214.48.
+```
+```{r}
+dem_disbursements %>%   
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(disbursement_description) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2021, after payroll and payroll tax, the GA Democratic Party spent the most on printing and postage for mail promoting Ossoff ($1,102,586.27) and then Warnock ($716,299.59).
+#In 2021, several GOTV disbursement descriptions made the top ten: canvass program fees ($224,698.80), GOTV robocalls ($130,111.70) and digital event production for a GOTV rally ($109,425.17).
+
+dem_disbursements %>%   
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(disbursement_description) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2022, the GA Democratic Party spent even more on printing and postage and focused these efforts specifically on Warnock - $5,344,811.48 for Warnock in the top ten. Sanford Bishop's House campaign also benefited from some expenditures on printing and postage.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "POSTAGE")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the GA Democratic Party spent $1,117,944 on postage, suggesting that this is about how much the party spent on mailers.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "POSTAGE")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2022, the GA Democratic Party spent way more - $5,787,744 - on postage and printing for mailers.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the party spent $52,425.70 on food, entertainment, ads, postage and security for early voting efforts or rallies.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2022, the party spent more than in 2021 -  $93,853.88 - on early voting efforts, with less mention of rallies.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY") | str_detect(disbursement_description, "GOTV")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the party spent $871,267.70 on early voting and get out the vote efforts: print and digital ads, entertainment, radio advertising and digital event production.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY") | str_detect(disbursement_description, "GOTV")) %>% 
+  summarize(sum(disbursement_amount))
+# In 2022, $1,357,587 on early voting and GOTV efforts.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "RADIO")) %>% 
+  summarize(sum(disbursement_amount))
+#$10,600 on GOTV radio ads in 2021
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "RADIO")) %>% 
+  summarize(sum(disbursement_amount))
+#$135,000 on radio ads in 2022, and they were Spanish radio ads in particular.
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "CANVASS") | str_detect(disbursement_description, "CALL") | str_detect(disbursement_description, "PHONE"))%>% 
+  summarize(sum(disbursement_amount))
+#In 2021, $361,810.59 on canvassing and phone calls - more direct communication with voters. This includes $15,525 on a "voter protection hotline."
+
+dem_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "CANVASS") | str_detect(disbursement_description, "CALL") | str_detect(disbursement_description, "PHONE"))%>% 
+  summarize(sum(disbursement_amount))
+#In 2022, the party only spent $15,024.71 on canvassing and phone calls. This is interesting. And it tracks with what I read on NPR about how, according to a Democratic strategist, Republicans put in a lot of work "on the ground" - knocking on doors, making phone calls, etc. - and Democrats' last-ditch efforts to do this kind of work after the general election were barely enough.
+https://www.npr.org/2022/12/07/1141372574/what-georgias-runoff-election-results-mean-for-political-parties
+
+```
+#Disbursements - Reps
+```{r}
+rep_disbursements <- rep_disbursements %>% 
+  distinct()
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+# In 2021, the state Republican party made the largest number of payments, 54, to Synovus Bank, with 45 payments to Chick Fil A. Waffle House, Wal Mart and McDonald's also made the top ten. 
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2021, the state Republican party paid the largest amount of money ($1,413,321.89) to Political Travel Partners LLC, which I'm guessing in a political strategy firm. FLS Connect, a telefundraising and voter contact firm, got the second highest amount of money, $1,121,350.94. This bears out the idea that the GA Republican party put more resources into direct communication with voters, even going back to 2021. In Field Strategies is also apparently a voter contact firm.
+```
+```{r}
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(count = n()) %>% 
+  arrange(desc(count))
+# In 2022, the state Republican party again made the largest number of payments to Synovus Bank. Chick Fil A again made the top ten.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(recipient_name) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+# In 2022, a marketing agency called Arena Communications got the most from the party: $2,947,494.13. Another marketing agency, Smart Media Group, got the second most: $344,867.50. The Stoneridge Group, LLC, a political consulting firm, got $329,248.61. This suggests that in 2022, as it became clear that Democrats stand a chance to make gains in Georgia, the state party sought out professional marketing and campaign advice.
+```
+```{r}
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  group_by(disbursement_description) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2021, the GA Republican Party spent most on GOTV calls ($1,452,969.98), the second most on an app using in canvassing ($919,690.88) and the third most on "canvassing" ($846,461.85). More than $600,000 in mailers also made the top ten under two separate labels.
+
+rep_disbursements %>%   
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  group_by(disbursement_description) %>% 
+  summarize(total_amount = sum(disbursement_amount)) %>% 
+  arrange(desc(total_amount))
+#In 2022, the GA Republican Party spent a lot of money on mailers, but not as much as the Democrats: $4,739,655.80. This seems like a marked change in strategy from 2021, when the party spent the most on phone calls and canvassing. GOTV text messages accounted for $205,771.97.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "MAIL") | str_detect(disbursement_description, "Mail") | str_detect(disbursement_description, "POSTAGE") | str_detect(disbursement_description, "Postage")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the GA Republican party spent $1,049,086 on postage and mailers.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "MAIL") | str_detect(disbursement_description, "Mail") | str_detect(disbursement_description, "POSTAGE") | str_detect(disbursement_description, "Postage")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2022, the party spent $4,740,953 on postage and mailers - much more than in 2021.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY")) %>% 
+  summarize(sum(disbursement_amount))
+#No expenditures were labeled as pertaining to early voting efforts in 2021.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "EARLY")) %>% 
+  summarize(sum(disbursement_amount))
+#...or in 2022.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "GOTV")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the GA Republican Party spent $1,506,735 on GOTV-related expenses: phone calls, advertising for the runoff and text messages.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "GOTV")) %>% 
+  summarize(sum(disbursement_amount))
+#In 2022, the GA Republican Party spent less - $410,496.50 - on GOTV expenses, though not all pertinent expenses might be labeled GOTV.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "RADIO")) %>% 
+  summarize(sum(disbursement_amount))
+#No radio expenditures in 2021.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "RADIO")) %>% 
+  summarize(sum(disbursement_amount))
+#...or 2022.
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2021-01-01" & disbursement_date <= "2021-12-31") %>% 
+  filter(str_detect(disbursement_description, "CANVASS") | str_detect(disbursement_description, "CALL") | str_detect(disbursement_description, "PHONE"))%>% 
+  summarize(sum(disbursement_amount))
+#In 2021, the GA Republican Party spent $2,299,924 on voter registration and GOTV calls, as well as canvassing - much, much more than the state Democratic Party. 
+
+rep_disbursements %>% 
+  filter(disbursement_date >= "2022-01-01" & disbursement_date <= "2022-12-31") %>% 
+  filter(str_detect(disbursement_description, "CANVASS") | str_detect(disbursement_description, "CALL") | str_detect(disbursement_description, "PHONE"))%>% 
+  summarize(sum(disbursement_amount))
+# It looks like the Republicans spent much more on mailers and much less on canvassing and phone calls in 2022.
+```
+
+
+#Reading in election results
+ELECTION RESULTS
+```{r}
+runoff_2021 <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/runoff_2021.csv")
+runoff_2022 <- read_csv("~/Documents/GitHub/data_journalism_2022_fall/major_assignments/Georgia campaign finance/runoff_2022.csv")
+
+```
+```{r}
+
+
+
+
+runoff_2022 <- runoff_2022 %>% 
+  select(-2) %>% 
+  rename(county = "US Senate (Vote For 1)",
+         walker_election_day = "...3",
+         walker_absentee_mail = "...4",
+         walker_early = "...5",
+         walker_provisional = "...6",
+         walker_total = "...7",
+         warnock_election_day_22 = "...8",
+         warnock_absentee_mail_22 = "...9",
+         warnock_early_22 = "...10",
+         warnock_provisional_22 = "...11",
+         warnock_total_22 = "...12",
+         total = "...13") %>% 
+  slice(3:161)
+
+runoff_2022 <- runoff_2022 %>% 
+  mutate(walker_election_day = as.numeric(walker_election_day)) %>% 
+  mutate(walker_absentee_mail = as.numeric(walker_absentee_mail)) %>% 
+  mutate(walker_early = as.numeric(walker_early)) %>% 
+  mutate(walker_provisional = as.numeric(walker_provisional)) %>% 
+  mutate(walker_total = as.numeric(walker_total)) %>% 
+  mutate(warnock_election_day_22 = as.numeric(warnock_election_day_22)) %>% 
+  mutate(warnock_absentee_mail_22 = as.numeric(warnock_absentee_mail_22)) %>% 
+  mutate(warnock_early_22 = as.numeric(warnock_early_22)) %>% 
+  mutate(warnock_provisional_22 = as.numeric(warnock_provisional_22)) %>% 
+  mutate(warnock_total_22 = as.numeric(warnock_total_22)) %>% 
+  mutate(total = as.numeric(total))
+
+runoff_2021 <- runoff_2021 %>% 
+  select(-2) %>% 
+  rename(county = "US Senate (Loeffler) - Special",
+         loeffler_election_day = "...3",
+         loeffler_absentee_mail = "...4",
+         loeffler_early = "...5",
+         loeffler_provisional = "...6",
+         loeffler_total = "...7",
+         warnock_election_day_21 = "...8",
+         warnock_absentee_mail_21 = "...9",
+         warnock_early_21 = "...10",
+         warnock_provisional_21 = "...11",
+         warnock_total_21 = "...12",
+         total = "...13") %>% 
+  slice(3:161)
+
+runoff_2021 <- runoff_2021 %>% 
+  mutate(loeffler_election_day = as.numeric(loeffler_election_day)) %>% 
+  mutate(loeffler_absentee_mail = as.numeric(loeffler_absentee_mail)) %>% 
+  mutate(loeffler_early = as.numeric(loeffler_early)) %>% 
+  mutate(loeffler_provisional = as.numeric(loeffler_provisional)) %>% 
+  mutate(loeffler_total = as.numeric(loeffler_total)) %>% 
+  mutate(warnock_election_day_21 = as.numeric(warnock_election_day_21)) %>% 
+  mutate(warnock_absentee_mail_21 = as.numeric(warnock_absentee_mail_21)) %>% 
+  mutate(warnock_early_21 = as.numeric(warnock_early_21)) %>% 
+  mutate(warnock_provisional_21 = as.numeric(warnock_provisional_21)) %>% 
+  mutate(warnock_total_21 = as.numeric(warnock_total_21)) %>% 
+  mutate(total = as.numeric(total))
+
+runoff_2021 <-
+  runoff_2021 %>% 
+  mutate(loeffler_percent = (loeffler_total/total)*100) %>% 
+  mutate(warnock_percent_2021 = (warnock_total_21/total)*100)
+
+runoff_2022 <-
+  runoff_2022 %>% 
+  mutate(walker_percent = (walker_total/total)*100) %>% 
+  mutate(warnock_percent_2022 = (warnock_total_22/total)*100)
+
+comp_runoffs <- inner_join(runoff_2021, runoff_2022, by="county")
+
+comp_runoffs <- comp_runoffs %>% 
+  mutate(warnock_difference_percent = warnock_percent_2022 - warnock_percent_2021) %>% 
+  mutate(walker_loeffler_difference_percent = walker_percent - loeffler_percent)
+
+counties <- counties()
+
+ga_counties <- counties %>% 
+  filter(STATEFP == "13")
+
+ga_counties_w_runoffs <- ga_counties %>% 
+  left_join(comp_runoffs, by = c("NAME" = "county"))
+            
+ggplot() +
+  geom_sf(data=ga_counties_w_runoffs, aes(fill=warnock_difference_percent))+
+  theme_minimal()
+#This map shows that in the 2022 runoff Warnock got a higher percent of the vote in Democratic strongholds like Atlanta and Savannah than he did in 2021 against Loeffler. At the same time, it shows that he did worse in much of the rest of the state.
+```
+
+```{r}
+ggplot() +
+  geom_sf(data=ga_counties_w_runoffs, aes(fill=walker_loeffler_difference_percent))+
+  theme_minimal()
+# In the 2022 runoff Walker got a lower percent of the vote in Democratic strongholds like Atlanta, Savannah and Augusta than Loeffler did in the 2021 runoff against Warnock.
+```
+```{r}
+comp_runoffs <- comp_runoffs %>% 
+  mutate(warnock_percent_early_2022 = (warnock_early_22/warnock_total_22)*100) %>% 
+  mutate(warnock_percent_early_2021 = (warnock_early_21/warnock_total_21)*100) %>% 
+  mutate(warnock_early_difference = warnock_percent_early_2022 - warnock_percent_early_2021)
+
+ggplot() +
+  geom_sf(data=ga_counties_w_runoffs, aes(fill=warnock_early_difference))+
+  theme_minimal()
+
+#The map shows that a Warnock got a higher percentage of his votes from early voting in the 2022 runoff than in the 2021 runoff in almost every state, even though the period between the general election and runoff this year was shortened from nine to four weeks by a new law. Perhaps the Georgia Democratic Party's efforts to keep investing in early voting promotion and GOTV efforts helped.
+```
+
+
+
+
+
